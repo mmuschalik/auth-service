@@ -1,10 +1,13 @@
+import Model.{Credential, RegisterAccount, Session, User}
+import Repository.AccountRepository
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.Done
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
-
+import akka.http.scaladsl.server.directives.Credentials
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.Future
@@ -15,7 +18,7 @@ import de.heikoseeberger.akkahttpjson4s.Json4sSupport._
 
 import scala.util.{Failure, Success}
 
-object Application {
+object MainApp {
 
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
@@ -26,23 +29,39 @@ object Application {
 
   val logger = Logger("AppService")
 
+  def myUserPassAuthenticator(credentials: Credentials): Future[Option[Session]] = {
+    ApplicationService.login(credentials)
+  }
 
   def main(args: Array[String]) {
 
-    val route: Route = post {
-      path("create-user") {
-        entity(as[User]) { user =>
 
-          val f = async {
-            logger.info("Going to execute now")
-            val num = await(Repository.createUser(user))
-            logger.info(num.toString)
-            num
-          }
+
+    val route: Route =
+     path("register") {
+        entity(as[RegisterAccount]) { acc =>
+
+          val f = ApplicationService.registerAccount(acc)
 
           onComplete(f) {
-            case Success(i) => complete("Yes")
-            case Failure(i) => { logger.info(i.toString); complete("No")}
+            case Success(i) => complete(f)
+            case Failure(i) => {
+              logger.info(i.toString);
+              complete("No")
+            }
+          }
+        }
+     } ~
+     authenticateBasicAsync(realm = "secure site", myUserPassAuthenticator) { session =>
+      path("account" / IntNumber / "activate") { accountId =>
+        parameters('activationKey) { activationKey =>
+          val f = ApplicationService.activateAccount(session, activationKey)
+          onComplete(f) {
+            case Success(i) => complete(f)
+            case Failure(i) => {
+              logger.info(i.toString);
+              complete("No")
+            }
           }
         }
       }
