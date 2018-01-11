@@ -1,17 +1,14 @@
-import Model.{Credential, RegisterAccount, Session, User}
-import Repository.AccountRepository
+import Model.{RegisterAccount, Session}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
-import akka.Done
 import akka.http.scaladsl.model.StatusCodes
+import akka.stream.ActorMaterializer
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.directives.Credentials
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.Future
-import scala.async.Async.{async, await}
 import scala.io.StdIn
 import org.json4s._
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport._
@@ -46,8 +43,8 @@ object MainApp {
           onComplete(f) {
             case Success(i) => complete(f)
             case Failure(i) => {
-              logger.info(i.toString);
-              complete("No")
+              logger.error(i.toString);
+              complete(StatusCodes.BadRequest)
             }
           }
         }

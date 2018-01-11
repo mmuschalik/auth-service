@@ -7,15 +7,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import Repository._
 import Model._
 import akka.http.scaladsl.server.directives.Credentials
+import org.apache.commons.codec.digest.DigestUtils
 
 object ApplicationService {
+
+  private val salt = "gentleman-jack"
 
   def registerAccount(acc: RegisterAccount): Future[Option[Account]] = async {
     val account = await {AccountRepository.createAccount(Account(0, acc.name, false))}
 
     if(account.isDefined) {
-      val userId = await {
-       UserRepository.createUser(User(0, account.get.id, acc.userName, acc.email, acc.password, Map()))
+      val created = await {
+        addUser(AddUser(acc.userName, acc.email, acc.password),Session(User(0, account.get.id, acc.userName, acc.email, acc.password, Map())))
       }
     }
     account
@@ -30,7 +33,7 @@ object ApplicationService {
         val user = await {
           UserRepository.findUser(p.identifier)
         }
-        val verified = user.exists(u => p.verify(u.password))
+        val verified = user.exists(u => p.verify(u.password, pw => DigestUtils.sha1Hex(salt + pw) ))
         if (verified)
           Some(Session(user.get))
         else
@@ -41,7 +44,7 @@ object ApplicationService {
   }
 
   def addUser(user: AddUser, session: Session): Future[Boolean] = async {
-    await {UserRepository.createUser(User(0,session.user.accountId, user.userName, user.email, user.password, Map())) }
+    await {UserRepository.createUser(User(0,session.user.accountId, user.userName, user.email, DigestUtils.sha1Hex(salt + user.password), Map())) }
     // add log
     true
   }
