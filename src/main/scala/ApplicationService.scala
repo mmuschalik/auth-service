@@ -9,34 +9,41 @@ import Model._
 import akka.http.scaladsl.server.directives.Credentials
 import org.apache.commons.codec.digest.DigestUtils
 
-object ApplicationService {
+
+
+class ApplicationService(
+  implicit val accountRepository: AccountRepositoryTrait,
+  implicit val userRepository: UserRepositoryTrait,
+  implicit val sessionRepository: SessionRepository) {
+
 
   private val salt = "gentleman-jack"
 
   def registerAccount(acc: RegisterAccount): Future[Option[Account]] = async {
-    val account = await {AccountRepository.createAccount(Account(0, acc.name, false))}
+    val account = await {accountRepository.create(Account(0, acc.name, false))}
 
     if(account.isDefined) {
       val created = await {
-        addUser(AddUser(acc.userName, acc.email, acc.password),Session(User(0, account.get.id, acc.userName, acc.email, acc.password, Map())))
+        addUser(AddUser(acc.userName, acc.email, acc.password),Session(Token(""), User(0, account.get.id, acc.userName, acc.email, acc.password, Map())))
       }
     }
     account
   }
 
-  def activateAccount(session: Session, activationKey: String): Future[Boolean] = AccountRepository.activateAccount(session.user.accountId, activationKey)
+  def activateAccount(session: Session, activationKey: String): Future[Boolean] = accountRepository.activate(session.user.accountId, activationKey)
 
 
   def login(credentials: Credentials): Future[Option[Session]] = async {
     credentials match {
       case p@Credentials.Provided(id) => {
         val user = await {
-          UserRepository.findUser(p.identifier)
+          userRepository.findByName(p.identifier)
         }
         val verified = user.exists(u => p.verify(u.password, pw => DigestUtils.sha1Hex(salt + pw) ))
-        if (verified)
-          Some(Session(user.get))
-        else
+        if (verified) {
+          val session = await {sessionRepository.create(Session(Token(""), user.get))}
+          session
+        } else
           None
       }
       case _ => None
@@ -44,7 +51,7 @@ object ApplicationService {
   }
 
   def addUser(user: AddUser, session: Session): Future[Boolean] = async {
-    await {UserRepository.createUser(User(0,session.user.accountId, user.userName, user.email, DigestUtils.sha1Hex(salt + user.password), Map())) }
+    await {userRepository.create(User(0,session.user.accountId, user.userName, user.email, DigestUtils.sha1Hex(salt + user.password), Map())) }
     // add log
     true
   }

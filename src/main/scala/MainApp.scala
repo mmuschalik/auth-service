@@ -14,6 +14,7 @@ import org.json4s._
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport._
 
 import scala.util.{Failure, Success}
+import Services._
 
 object MainApp {
 
@@ -25,20 +26,19 @@ object MainApp {
   implicit val formats = DefaultFormats
 
   val logger = Logger("AppService")
+  val applicationService = new ApplicationService()
 
   def myUserPassAuthenticator(credentials: Credentials): Future[Option[Session]] = {
-    ApplicationService.login(credentials)
+    applicationService.login(credentials)
   }
 
   def main(args: Array[String]) {
-
-
 
     val route: Route =
      path("register") {
         entity(as[RegisterAccount]) { acc =>
 
-          val f = ApplicationService.registerAccount(acc)
+          val f = applicationService.registerAccount(acc)
 
           onComplete(f) {
             case Success(i) => complete(f)
@@ -52,7 +52,7 @@ object MainApp {
      authenticateBasicAsync(realm = "secure site", myUserPassAuthenticator) { session =>
       path("account" / IntNumber / "activate") { accountId =>
         parameters('activationKey) { activationKey =>
-          val f = ApplicationService.activateAccount(session, activationKey)
+          val f = applicationService.activateAccount(session, activationKey)
           onComplete(f) {
             case Success(i) => complete(f)
             case Failure(i) => {

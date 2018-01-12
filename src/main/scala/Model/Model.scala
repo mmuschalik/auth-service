@@ -6,7 +6,7 @@ case class Token(str: String)
 case class Role(id: Int, name: String)
 case class Permission(id: Int, permissionId: String)
 case class Group(id: Int, parentGroupId: Int, name: String)
-case class Session(user: User)
+case class Session(token: Token, user: User)
 
 // Commands
 case class RegisterAccount(name: String, userName: String, email: String, password: String)

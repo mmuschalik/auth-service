@@ -1,0 +1,43 @@
+package Repository
+
+import com.github.mauricio.async.db.postgresql.PostgreSQLConnection
+import com.github.mauricio.async.db.postgresql.util.URLParser
+
+import scala.async.Async.{async, await}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import Model._
+
+trait SessionRepositoryTrait {
+  def create(session: Session) : Future[Option[Session]]
+  def findByToken(token: String) : Future[Option[Session]]
+}
+
+class SessionRepository extends SessionRepositoryTrait {
+
+  val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/auth?user=postgres&password=actio")
+
+  def create(session: Session) : Future[Option[Session]] = async {
+
+    val con = await { new PostgreSQLConnection(configuration).connect }
+    val result = await { con.sendPreparedStatement("insert into usersession(userid,accountid,username,email) values (?, ?, ?, ?) returning token,userid,accountid,username,email",
+      List(session.user.id, session.user.accountId, session.user.userName, session.user.email)) }
+
+    val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map())))
+
+    await {con.disconnect}
+    ret
+  }
+
+  def findByToken(token: String) : Future[Option[Session]] = async {
+
+    val con = await { new PostgreSQLConnection(configuration).connect }
+    val result = await { con.sendPreparedStatement("select * from usersession where token = ?", List(token)) }
+
+    val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map())))
+
+    await {con.disconnect}
+    ret
+  }
+
+}

@@ -8,11 +8,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import Model._
 
-object UserRepository {
+trait UserRepositoryTrait {
+  def findByName(userName: String) : Future[Option[User]]
+  def create(user: User) : Future[Int]
+}
+
+class UserRepository extends UserRepositoryTrait {
 
   val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/auth?user=postgres&password=actio")
 
-  def findUser(userName: String) : Future[Option[User]] = async {
+  def findByName(userName: String) : Future[Option[User]] = async {
 
     val con = await { new PostgreSQLConnection(configuration).connect }
     val result = await { con.sendPreparedStatement("select id, accountid, username, email, password from users where username = ?", List(userName)) }
@@ -23,7 +28,7 @@ object UserRepository {
     ret
   }
 
-  def createUser(user: User) : Future[Int] = async {
+  def create(user: User) : Future[Int] = async {
 
     val con = await { new PostgreSQLConnection(configuration).connect }
     val result = await { con.sendPreparedStatement("insert into users(accountid,username, email, password) values(?, ?, ?, ?)", List(user.accountId,user.userName, user.email, user.password)) }
