@@ -22,3 +22,5 @@ libraryDependencies += "org.json4s" %% "json4s-native" % "3.5.1"
 libraryDependencies += "com.github.mauricio" %% "postgresql-async" % "0.2.21"
 
 libraryDependencies += "commons-codec" % "commons-codec" % "1.11"
+
+libraryDependencies += "com.typesafe" % "config" % "1.3.1"

@@ -7,23 +7,24 @@ import scala.async.Async.{async, await}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import Model._
+import com.typesafe.config.Config
 
 trait SessionRepositoryTrait {
   def create(session: Session) : Future[Option[Session]]
   def findByToken(token: String) : Future[Option[Session]]
 }
 
-class SessionRepository extends SessionRepositoryTrait {
+class SessionRepository(implicit val config: Config) extends SessionRepositoryTrait {
 
-  val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/auth?user=postgres&password=actio")
+  val configuration = URLParser.parse(config.getString("connection"))
 
   def create(session: Session) : Future[Option[Session]] = async {
 
     val con = await { new PostgreSQLConnection(configuration).connect }
-    val result = await { con.sendPreparedStatement("insert into usersession(userid,accountid,username,email) values (?, ?, ?, ?) returning token,userid,accountid,username,email",
-      List(session.user.id, session.user.accountId, session.user.userName, session.user.email)) }
+    val result = await { con.sendPreparedStatement("insert into usersession(token, userid,accountid,username,email, expiry) values (?, ?, ?, ?, ?, ?) returning token,userid,accountid,username,email,expiry",
+      List(session.token.str, session.user.id, session.user.accountId, session.user.userName, session.user.email, session.expiry)) }
 
-    val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map())))
+    val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map()), r("expiry").toString.toLong))
 
     await {con.disconnect}
     ret
@@ -34,7 +35,7 @@ class SessionRepository extends SessionRepositoryTrait {
     val con = await { new PostgreSQLConnection(configuration).connect }
     val result = await { con.sendPreparedStatement("select * from usersession where token = ?", List(token)) }
 
-    val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map())))
+    val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map()), r("expiry").toString.toLong))
 
     await {con.disconnect}
     ret

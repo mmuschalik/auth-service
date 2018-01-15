@@ -50,6 +50,9 @@ object MainApp {
         }
      } ~
      authenticateBasicAsync(realm = "secure site", myUserPassAuthenticator) { session =>
+       path("login") {
+         complete(session)
+       } ~
       path("account" / IntNumber / "activate") { accountId =>
         parameters('activationKey) { activationKey =>
           val f = applicationService.activateAccount(session, activationKey)

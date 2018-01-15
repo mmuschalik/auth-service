@@ -7,6 +7,7 @@ import scala.async.Async.{async, await}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import Model._
+import com.typesafe.config.Config
 
 trait AccountRepositoryTrait {
   def create(acc: Account): Future[Option[Account]]
@@ -14,9 +15,9 @@ trait AccountRepositoryTrait {
 }
 
 
-class AccountRepository extends AccountRepositoryTrait {
+class AccountRepository(implicit val config: Config) extends AccountRepositoryTrait {
 
-  val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/auth?user=postgres&password=actio")
+  val configuration = URLParser.parse(config.getString("connection"))
 
   def create(acc: Account): Future[Option[Account]] = async {
     val key = java.util.UUID.randomUUID().toString

@@ -7,15 +7,16 @@ import scala.async.Async.{async, await}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import Model._
+import com.typesafe.config.Config
 
 trait UserRepositoryTrait {
   def findByName(userName: String) : Future[Option[User]]
   def create(user: User) : Future[Int]
 }
 
-class UserRepository extends UserRepositoryTrait {
+class UserRepository(implicit val config: Config) extends UserRepositoryTrait {
 
-  val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/auth?user=postgres&password=actio")
+  val configuration = URLParser.parse(config.getString("connection"))
 
   def findByName(userName: String) : Future[Option[User]] = async {
 

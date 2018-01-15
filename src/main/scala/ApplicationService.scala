@@ -7,6 +7,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import Repository._
 import Model._
 import akka.http.scaladsl.server.directives.Credentials
+import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.digest.DigestUtils
 
 
@@ -24,7 +25,8 @@ class ApplicationService(
 
     if(account.isDefined) {
       val created = await {
-        addUser(AddUser(acc.userName, acc.email, acc.password),Session(Token(""), User(0, account.get.id, acc.userName, acc.email, acc.password, Map())))
+
+        addUser(AddUser(acc.userName, acc.email, acc.password),Session(Token(""), User(0, account.get.id, acc.userName, acc.email, acc.password, Map()), 0))
       }
     }
     account
@@ -41,7 +43,13 @@ class ApplicationService(
         }
         val verified = user.exists(u => p.verify(u.password, pw => DigestUtils.sha1Hex(salt + pw) ))
         if (verified) {
-          val session = await {sessionRepository.create(Session(Token(""), user.get))}
+          var rnd = new java.security.SecureRandom()
+          val bytes = new Array[Byte](24)
+          rnd.nextBytes(bytes)
+          val token = Token(Base64.encodeBase64String(bytes))
+          val expiry = System.currentTimeMillis() + 1000*60*60*24
+
+          val session = await {sessionRepository.create(Session(token, user.get, expiry))}
           session
         } else
           None
