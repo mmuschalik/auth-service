@@ -56,6 +56,17 @@ class ApplicationService(
     }
   }
 
+  def validateToken(credentials: Credentials): Future[Option[Session]] = async {
+    credentials match {
+      case Credentials.Provided(token) => {
+        val session = await { sessionRepository.findByToken(token, System.currentTimeMillis()) }
+        session
+      }
+      case _ => None
+    }
+
+  }
+
   def addUser(user: AddUser, session: Session): Future[Boolean] = async {
     await { userRepository.create(User(0, session.user.accountId, user.userName, user.email, DigestUtils.sha1Hex(salt + user.password), Map())) }
     // add log

@@ -1,4 +1,4 @@
-import Model.{RegisterAccount, Session}
+import Model.{RegisterAccount, Session, Token}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
@@ -27,10 +27,6 @@ object MainApp {
   val logger = Logger("AppService")
   val applicationService = new ApplicationService()
 
-  def myUserPassAuthenticator(credentials: Credentials): Future[Option[Session]] = {
-    applicationService.login(credentials)
-  }
-
   def main(args: Array[String]) {
 
     val route: Route =
@@ -48,7 +44,7 @@ object MainApp {
           }
         }
       } ~
-        authenticateBasicAsync(realm = "secure site", myUserPassAuthenticator) { session =>
+        authenticateBasicAsync(realm = "secure site", credentials => applicationService.login(credentials)) { session =>
           path("login") {
             complete(session)
           } ~
@@ -64,6 +60,11 @@ object MainApp {
                 }
               }
             }
+        } ~
+        authenticateOAuth2Async(realm = "secure site", credentials => applicationService.validateToken(credentials)) { session =>
+          path("validate") {
+            complete(session)
+          }
         }
 
     val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)

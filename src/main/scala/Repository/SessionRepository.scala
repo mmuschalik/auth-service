@@ -11,7 +11,7 @@ import com.typesafe.config.Config
 
 trait SessionRepositoryTrait {
   def create(session: Session): Future[Option[Session]]
-  def findByToken(token: String): Future[Option[Session]]
+  def findByToken(token: String, expiry: Long): Future[Option[Session]]
 }
 
 class SessionRepository(implicit val config: Config) extends SessionRepositoryTrait {
@@ -34,10 +34,10 @@ class SessionRepository(implicit val config: Config) extends SessionRepositoryTr
     ret
   }
 
-  def findByToken(token: String): Future[Option[Session]] = async {
+  def findByToken(token: String, expiry: Long): Future[Option[Session]] = async {
 
     val con = await { new PostgreSQLConnection(configuration).connect }
-    val result = await { con.sendPreparedStatement("select * from usersession where token = ?", List(token)) }
+    val result = await { con.sendPreparedStatement("select * from usersession where token = ? and expiry >= ?", List(token, expiry)) }
 
     val ret = result.rows.flatMap(_.headOption).map(r => Session(Token(r("token").toString), User(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, r("email").toString, "", Map()), r("expiry").toString.toLong))
 

@@ -11,5 +11,5 @@ Endpoints implemented:
 ```
 
 ```http
-/authenticate
+/validate
 ```
