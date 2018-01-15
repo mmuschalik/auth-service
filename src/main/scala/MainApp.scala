@@ -21,7 +21,6 @@ object MainApp {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
-
   implicit val serialization = native.Serialization
   implicit val formats = DefaultFormats
 
@@ -35,7 +34,7 @@ object MainApp {
   def main(args: Array[String]) {
 
     val route: Route =
-     path("register") {
+      path("register") {
         entity(as[RegisterAccount]) { acc =>
 
           val f = applicationService.registerAccount(acc)
@@ -48,24 +47,24 @@ object MainApp {
             }
           }
         }
-     } ~
-     authenticateBasicAsync(realm = "secure site", myUserPassAuthenticator) { session =>
-       path("login") {
-         complete(session)
-       } ~
-      path("account" / IntNumber / "activate") { accountId =>
-        parameters('activationKey) { activationKey =>
-          val f = applicationService.activateAccount(session, activationKey)
-          onComplete(f) {
-            case Success(i) => complete(f)
-            case Failure(i) => {
-              logger.info(i.toString);
-              complete("No")
+      } ~
+        authenticateBasicAsync(realm = "secure site", myUserPassAuthenticator) { session =>
+          path("login") {
+            complete(session)
+          } ~
+            path("account" / IntNumber / "activate") { accountId =>
+              parameters('activationKey) { activationKey =>
+                val f = applicationService.activateAccount(session, activationKey)
+                onComplete(f) {
+                  case Success(i) => complete(f)
+                  case Failure(i) => {
+                    logger.info(i.toString);
+                    complete("No")
+                  }
+                }
+              }
             }
-          }
         }
-      }
-    }
 
     val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)
     println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")

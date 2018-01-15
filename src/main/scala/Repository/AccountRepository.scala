@@ -14,30 +14,30 @@ trait AccountRepositoryTrait {
   def activate(accountId: Int, activationKey: String): Future[Boolean]
 }
 
-
 class AccountRepository(implicit val config: Config) extends AccountRepositoryTrait {
 
   val configuration = URLParser.parse(config.getString("connection"))
 
   def create(acc: Account): Future[Option[Account]] = async {
     val key = java.util.UUID.randomUUID().toString
-    val con = await { new PostgreSQLConnection(configuration).connect }
-    val result = await { con.sendPreparedStatement("insert into account(name,activated,activationkey) values(?, ?, ?) returning id,name,activated", List(acc.name,acc.activated, key)) }
 
-    val ret = result.rows.flatMap(_.headOption).map(r => Account(r("id").toString.toInt,r("name").toString, r("activated").toString.toBoolean))
+    val connection = await { new PostgreSQLConnection(configuration).connect }
+    val queryResult = await { connection.sendPreparedStatement("insert into account(name,activated,activationkey) values(?, ?, ?) returning id,name,activated", List(acc.name, acc.activated, key)) }
 
-    await {con.disconnect}
-    ret
+    val result = queryResult.rows.flatMap(_.headOption).map(r => Account(r("id").toString.toInt, r("name").toString, r("activated").toString.toBoolean))
+
+    await { connection.disconnect }
+    result
   }
 
   def activate(accountId: Int, activationKey: String): Future[Boolean] = async {
-    val con = await { new PostgreSQLConnection(configuration).connect }
-    val result = await { con.sendPreparedStatement("update account set activated=true where id = ? and activationkey = ?", List(accountId, activationKey)) }
+    val connection = await { new PostgreSQLConnection(configuration).connect }
+    val queryResult = await { connection.sendPreparedStatement("update account set activated=true where id = ? and activationkey = ?", List(accountId, activationKey)) }
 
-    val ret = result.rowsAffected == 1
+    val result = queryResult.rowsAffected == 1
 
-    await {con.disconnect}
-    ret
+    await { connection.disconnect }
+    result
   }
 
 }
