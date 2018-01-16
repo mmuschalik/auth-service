@@ -12,7 +12,7 @@ import com.typesafe.config.Config
 
 trait SessionRepositoryTrait extends RepoTrait {
   def saveAndGet(session: Session): Future[ValueObjects.Session]
-  def findByToken(token: String, expiry: Long): Future[Option[Session]]
+  def findByToken(token: String, expiry: Long): Future[Option[ValueObjects.Session]]
 }
 
 class SessionRepository(implicit val config: Config) extends SessionRepositoryTrait {
@@ -30,19 +30,18 @@ class SessionRepository(implicit val config: Config) extends SessionRepositoryTr
       )
     }
 
-    val ret = resultQuery.rows.flatMap(_.headOption).map(r => new ValueObjects.Session(r("userid").toString.toInt,r("accountid").toString.toInt, r("username").toString, Token(r("token").toString), r("expiry").toString.toLong))
+    val ret = resultQuery.rows.flatMap(_.headOption).map(r => ValueObjects.Session(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, Token(r("token").toString), r("expiry").toString.toLong))
 
     await { con.disconnect }
     ret.get
   }
 
-  def findByToken(token: String, expiry: Long): Future[Option[Session]] = async {
+  def findByToken(token: String, expiry: Long): Future[Option[ValueObjects.Session]] = async {
 
     val con = await { new PostgreSQLConnection(configuration).connect }
-    val result = await { con.sendPreparedStatement("select * from usersession where token = ? and expiry >= ?", List(token, expiry)) }
+    val resultQuery = await { con.sendPreparedStatement("select u.id as userid,u.accountid,u.username,u.email,s.token,s.expiry from usersession s inner join users u on (s.userid = u.id) where s.token = ? and s.expiry >= ?", List(token, expiry)) }
 
-    val ret = result.rows.flatMap(_.headOption).map(r => new Session(r("id").toString.toInt, r("userid").toString.toInt, Token(r("token").toString), r("expiry").toString.toLong))
-
+    val ret = resultQuery.rows.flatMap(_.headOption).map(r => ValueObjects.Session(r("userid").toString.toInt, r("accountid").toString.toInt, r("username").toString, Token(r("token").toString), r("expiry").toString.toLong))
     await { con.disconnect }
     ret
   }

@@ -25,15 +25,15 @@ class ApplicationService(
     await { accountRepository.save(account) }
 
     await {
-        addUser(AddUser(acc.userName, acc.email, acc.password), account.id)
+      addUser(AddUser(acc.userName, acc.email, acc.password), account.id)
     }
 
     account
   }
 
   def activateAccount(session: ValueObjects.Session, activationKey: String): Future[Boolean] = async {
-    val account = await {accountRepository.getById(session.accountId)}
-    if(account.activationKey == activationKey) {
+    val account = await { accountRepository.getById(session.accountId) }
+    if (account.activationKey == activationKey) {
       account.activate()
       await {
         accountRepository.save(account)
@@ -65,7 +65,7 @@ class ApplicationService(
     }
   }
 
-  def validateToken(credentials: Credentials): Future[Option[Session]] = async {
+  def validateToken(credentials: Credentials): Future[Option[ValueObjects.Session]] = async {
     credentials match {
       case Credentials.Provided(token) => {
         val session = await { sessionRepository.findByToken(token, System.currentTimeMillis()) }

@@ -22,18 +22,15 @@ class AccountRepository(implicit val config: Config) extends AccountRepositoryTr
 
     val connection = await { new PostgreSQLConnection(configuration).connect }
     val queryResult = await { connection.sendPreparedStatement("insert into account(name,activated,activationkey) values(?, ?, ?) returning id", List(acc.name, acc.isActive, acc.activationKey)) }
-    val result = queryResult.rows.flatMap(_.headOption).map(r => r("id").toString.toInt)
-
-    this.setId(acc, result.get)
+    val accountId = queryResult.rows.flatMap(_.headOption).map(r => r("id").toString.toInt).get
 
     await { connection.disconnect }
-    Unit
+    this.setId(acc, accountId)
   }
 
   private def update(acc: Account): Future[Unit] = async {
     val connection = await { new PostgreSQLConnection(configuration).connect }
-    val queryResult = await { connection.sendPreparedStatement("update account set name = ?,activated = ? from account where id = ?", List(acc.name, acc.isActive, acc.id)) }
-
+    await { connection.sendPreparedStatement("update account set name = ?,activated = ? from account where id = ?", List(acc.name, acc.isActive, acc.id)) }
     await { connection.disconnect }
     Unit
   }
@@ -42,12 +39,12 @@ class AccountRepository(implicit val config: Config) extends AccountRepositoryTr
     val connection = await { new PostgreSQLConnection(configuration).connect }
     val queryResult = await { connection.sendPreparedStatement("selected id,name,activated,activationkey from account where id = ?", List(id)) }
     val row = queryResult.rows.get.head
-    val result = new Account(row("id").toString.toInt, row("name").toString, row("activated").toString.toBoolean, row("activationkey").toString)
+    val account = new Account(row("id").toString.toInt, row("name").toString, row("activated").toString.toBoolean, row("activationkey").toString)
 
     await { connection.disconnect }
-    result
+    account
   }
 
-  def save(acc: Account): Future[Unit] = if(acc.id == 0) create(acc) else update(acc)
+  def save(acc: Account): Future[Unit] = if (acc.id == 0) create(acc) else update(acc)
 
 }
