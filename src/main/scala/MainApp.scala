@@ -1,4 +1,4 @@
-import Model.{RegisterAccount, Session, Token}
+import Aggregates.{RegisterAccount}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes

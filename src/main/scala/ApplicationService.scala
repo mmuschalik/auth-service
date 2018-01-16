@@ -1,11 +1,11 @@
-import Model._
-import Repository.AccountRepository
+import Aggregates.{Account, _}
 
 import scala.concurrent.Future
 import scala.async.Async.{async, await}
 import scala.concurrent.ExecutionContext.Implicits.global
 import Repository._
-import Model._
+import Aggregates._
+import ValueObjects.Token
 import akka.http.scaladsl.server.directives.Credentials
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.digest.DigestUtils
@@ -19,21 +19,30 @@ class ApplicationService(
 
   private val salt = "gentleman-jack"
 
-  def registerAccount(acc: RegisterAccount): Future[Option[Account]] = async {
-    val account = await { accountRepository.create(Account(0, acc.name, false)) }
+  def registerAccount(acc: RegisterAccount): Future[Account] = async {
+    val account = Account(acc.name)
 
-    if (account.isDefined) {
-      val created = await {
+    await { accountRepository.save(account) }
 
-        addUser(AddUser(acc.userName, acc.email, acc.password), Session(Token(""), User(0, account.get.id, acc.userName, acc.email, acc.password, Map()), 0))
-      }
+    await {
+        addUser(AddUser(acc.userName, acc.email, acc.password), account.id)
     }
+
     account
   }
 
-  def activateAccount(session: Session, activationKey: String): Future[Boolean] = accountRepository.activate(session.user.accountId, activationKey)
+  def activateAccount(session: ValueObjects.Session, activationKey: String): Future[Boolean] = async {
+    val account = await {accountRepository.getById(session.accountId)}
+    if(account.activationKey == activationKey) {
+      account.activate()
+      await {
+        accountRepository.save(account)
+      }
+    }
+    account.activationKey == activationKey
+  }
 
-  def login(credentials: Credentials): Future[Option[Session]] = async {
+  def login(credentials: Credentials): Future[Option[ValueObjects.Session]] = async {
     credentials match {
       case p @ Credentials.Provided(id) => {
         val user = await {
@@ -47,8 +56,8 @@ class ApplicationService(
           val token = Token(Base64.encodeBase64String(bytes))
           val expiry = System.currentTimeMillis() + 1000 * 60 * 60 * 24
 
-          val session = await { sessionRepository.create(Session(token, user.get, expiry)) }
-          session
+          val session = await { sessionRepository.saveAndGet(new Aggregates.Session(0, user.get.id, token, expiry)) }
+          Some(session)
         } else
           None
       }
@@ -67,10 +76,9 @@ class ApplicationService(
 
   }
 
-  def addUser(user: AddUser, session: Session): Future[Boolean] = async {
-    await { userRepository.create(User(0, session.user.accountId, user.userName, user.email, DigestUtils.sha1Hex(salt + user.password), Map())) }
+  def addUser(user: AddUser, accountId: Int): Future[Unit] = async {
+    await { userRepository.save(new User(0, accountId, user.userName, user.email, DigestUtils.sha1Hex(salt + user.password))) }
     // add log
-    true
   }
 
 }

@@ -6,38 +6,48 @@ import com.github.mauricio.async.db.postgresql.util.URLParser
 import scala.async.Async.{async, await}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import Model._
+import Aggregates.{Account, _}
 import com.typesafe.config.Config
 
-trait AccountRepositoryTrait {
-  def create(acc: Account): Future[Option[Account]]
-  def activate(accountId: Int, activationKey: String): Future[Boolean]
+trait AccountRepositoryTrait extends RepoTrait {
+  def getById(id: Int): Future[Account]
+  def save(acc: Account): Future[Unit]
 }
 
 class AccountRepository(implicit val config: Config) extends AccountRepositoryTrait {
 
   val configuration = URLParser.parse(config.getString("connection"))
 
-  def create(acc: Account): Future[Option[Account]] = async {
-    val key = java.util.UUID.randomUUID().toString
+  private def create(acc: Account): Future[Unit] = async {
 
     val connection = await { new PostgreSQLConnection(configuration).connect }
-    val queryResult = await { connection.sendPreparedStatement("insert into account(name,activated,activationkey) values(?, ?, ?) returning id,name,activated", List(acc.name, acc.activated, key)) }
+    val queryResult = await { connection.sendPreparedStatement("insert into account(name,activated,activationkey) values(?, ?, ?) returning id", List(acc.name, acc.isActive, acc.activationKey)) }
+    val result = queryResult.rows.flatMap(_.headOption).map(r => r("id").toString.toInt)
 
-    val result = queryResult.rows.flatMap(_.headOption).map(r => Account(r("id").toString.toInt, r("name").toString, r("activated").toString.toBoolean))
+    this.setId(acc, result.get)
+
+    await { connection.disconnect }
+    Unit
+  }
+
+  private def update(acc: Account): Future[Unit] = async {
+    val connection = await { new PostgreSQLConnection(configuration).connect }
+    val queryResult = await { connection.sendPreparedStatement("update account set name = ?,activated = ? from account where id = ?", List(acc.name, acc.isActive, acc.id)) }
+
+    await { connection.disconnect }
+    Unit
+  }
+
+  def getById(id: Int): Future[Account] = async {
+    val connection = await { new PostgreSQLConnection(configuration).connect }
+    val queryResult = await { connection.sendPreparedStatement("selected id,name,activated,activationkey from account where id = ?", List(id)) }
+    val row = queryResult.rows.get.head
+    val result = new Account(row("id").toString.toInt, row("name").toString, row("activated").toString.toBoolean, row("activationkey").toString)
 
     await { connection.disconnect }
     result
   }
 
-  def activate(accountId: Int, activationKey: String): Future[Boolean] = async {
-    val connection = await { new PostgreSQLConnection(configuration).connect }
-    val queryResult = await { connection.sendPreparedStatement("update account set activated=true where id = ? and activationkey = ?", List(accountId, activationKey)) }
-
-    val result = queryResult.rowsAffected == 1
-
-    await { connection.disconnect }
-    result
-  }
+  def save(acc: Account): Future[Unit] = if(acc.id == 0) create(acc) else update(acc)
 
 }
