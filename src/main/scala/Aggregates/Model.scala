@@ -4,7 +4,6 @@ package Aggregates
 
 class RoleAgg(id: Int, name: String)
 class GroupAgg(id: Int, parentGroupId: Int, name: String)
-class SessionAgg(id: Int, userId: Int, token: String, expiry: Long)
 
 class UserPermissionAgg(id: Int, permissions: Seq[Permission])
 class GroupPermissionAgg(id: Int, permissions: Seq[Permission])
